@@ -1,0 +1,127 @@
+name: Security pipeline
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: security-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+      - run: mkdir -p reports
+      - run: npm ci --ignore-scripts
+      - run: npm run check
+      - name: HTTP integration tests
+        run: npm test | tee reports/tests.txt
+      - name: Dependency gate
+        run: npm audit --audit-level=high --json > reports/npm-audit.json
+      - name: SAST gate
+        run: |
+          docker run --rm -v "$PWD:/src" semgrep/semgrep:1.179.0 semgrep scan \
+            --config security/semgrep.yml --error --strict --metrics=off --json \
+            --output reports/semgrep.json src public
+      - name: Test SAST detection rules
+        run: |
+          docker run --rm -v "$PWD:/src" semgrep/semgrep:1.179.0 semgrep scan \
+            --test --config security/semgrep.yml security/semgrep-tests
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: source-evidence
+          path: reports/
+          retention-days: 14
+  infrastructure:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - run: mkdir -p reports
+      - name: Terraform format and validation
+        run: |
+          docker run --rm -v "$PWD/infra/local:/work" -w /work hashicorp/terraform:1.14.0 fmt -check
+          docker run --rm -v "$PWD/infra/local:/work" -w /work hashicorp/terraform:1.14.0 init -backend=false
+          docker run --rm -v "$PWD/infra/local:/work" -w /work hashicorp/terraform:1.14.0 validate
+      - name: Terraform policy gate
+        run: |
+          docker run --rm -v "$PWD:/work" -w /work bridgecrew/checkov:3.3.20 \
+            --directory infra/local --config-file security/checkov.yml \
+            --output json > reports/checkov-terraform.json
+      - name: Kubernetes policy gate
+        run: |
+          docker run --rm -v "$PWD:/work" -w /work bridgecrew/checkov:3.3.20 \
+            --directory k8s --config-file security/checkov.yml \
+            --output json > reports/checkov-kubernetes.json
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: infrastructure-evidence
+          path: reports/
+          retention-days: 14
+  image:
+    needs: [source, infrastructure]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - run: mkdir -p reports
+      - run: docker build -t cloudshield:${{ github.sha }} .
+      - name: Export exact image for scanners
+        run: |
+          docker save cloudshield:${{ github.sha }} -o reports/image.tar
+          docker image inspect cloudshield:${{ github.sha }} --format '{{.Id}}' > reports/image-id.txt
+      - name: Image vulnerability gate
+        run: |
+          docker run --rm -v "$PWD/reports:/reports" aquasec/trivy:0.75.0 image \
+            --input /reports/image.tar --scanners vuln --severity HIGH,CRITICAL \
+            --exit-code 1 --format json --output /reports/trivy.json
+      - name: CycloneDX inventory
+        if: always()
+        run: |
+          docker run --rm -v "$PWD/reports:/reports" anchore/syft:v1.54.0 \
+            docker-archive:/reports/image.tar -o cyclonedx-json=/reports/sbom.cdx.json
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: image-evidence
+          path: |
+            reports/*.json
+            reports/image-id.txt
+          retention-days: 14
+      - name: Start constrained application container
+        run: |
+          docker run -d --name portal --read-only --cap-drop ALL \
+            --security-opt no-new-privileges --memory 128m --cpus 0.5 \
+            -p 127.0.0.1:3000:3000 cloudshield:${{ github.sha }}
+          for attempt in {1..30}; do
+            if curl -fsS http://127.0.0.1:3000/healthz; then exit 0; fi
+            sleep 2
+          done
+          docker logs portal
+          exit 1
+      - name: DAST gate against the exact scanned image
+        run: |
+          chmod 777 reports
+          docker run --rm --network host -v "$PWD/reports:/zap/wrk:rw" \
+            ghcr.io/zaproxy/zaproxy:2.16.1 zap-baseline.py \
+            -t http://127.0.0.1:3000 -J zap.json -r zap.html
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: runtime-evidence
+          path: |
+            reports/zap.*
+          if-no-files-found: warn
+          retention-days: 14
+      - name: Clean up application
+        if: always()
+        run: docker rm -f portal 2>/dev/null || true

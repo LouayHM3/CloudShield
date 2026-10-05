@@ -1,0 +1,70 @@
+# Intentionally vulnerable third-party target. Do not expose publicly.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cloudshield-target
+  labels:
+    pod-security.kubernetes.io/enforce: restricted
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: juice-shop
+  namespace: cloudshield-target
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: juice-shop
+  template:
+    metadata:
+      labels:
+        app: juice-shop
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: juice-shop
+          image: bkimminich/juice-shop:v17.1.1
+          ports:
+            - containerPort: 3000
+          securityContext:
+            allowPrivilegeEscalation: false
+            # SQLite data needs writes. This exception belongs only to the lab.
+            readOnlyRootFilesystem: false
+            capabilities:
+              drop: [ALL]
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 3000
+            initialDelaySeconds: 15
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 3000
+            initialDelaySeconds: 60
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: juice-shop
+  namespace: cloudshield-target
+spec:
+  selector:
+    app: juice-shop
+  ports:
+    - port: 3000
+      targetPort: 3000

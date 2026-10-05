@@ -1,0 +1,14 @@
+{
+  "name": "cloudshield",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Reproducible DevSecOps security automation lab and evidence portal",
+  "type": "module",
+  "engines": { "node": ">=24 <25" },
+  "scripts": {
+    "start": "node src/server.js",
+    "test": "node --test --experimental-test-coverage",
+    "check": "node --check src/server.js && node --check public/app.js",
+    "demo": "node scripts/demo.js"
+  }
+}

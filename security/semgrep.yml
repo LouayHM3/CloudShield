@@ -1,0 +1,22 @@
+rules:
+  - id: cloudshield-no-eval
+    languages: [javascript]
+    severity: ERROR
+    message: Dynamic evaluation is forbidden; use explicit parsing and validation.
+    pattern-either:
+      - pattern: eval(...)
+      - pattern: new Function(...)
+  - id: cloudshield-no-shell-exec
+    languages: [javascript]
+    severity: ERROR
+    message: Avoid shell execution in application code.
+    pattern-either:
+      - pattern: exec(...)
+      - pattern: execSync(...)
+  - id: cloudshield-no-weak-hash
+    languages: [javascript]
+    severity: ERROR
+    message: MD5 and SHA1 are unsuitable for security-sensitive hashing.
+    pattern-either:
+      - pattern: createHash('md5')
+      - pattern: createHash('sha1')

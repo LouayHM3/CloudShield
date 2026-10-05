@@ -1,0 +1,24 @@
+services:
+  portal:
+    build: .
+    ports:
+      - "127.0.0.1:3000:3000"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 128m
+    cpus: 0.5
+    restart: unless-stopped
+  localstack:
+    image: localstack/localstack:4.14.0
+    profiles: [lab]
+    ports:
+      - "127.0.0.1:4566:4566"
+    environment:
+      SERVICES: ec2
+      AWS_DEFAULT_REGION: us-east-1
+    healthcheck:
+      test: [CMD, curl, -f, "http://localhost:4566/_localstack/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 30

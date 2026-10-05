@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="CloudShield: reproducible cloud security automation with DevSecOps.">
+  <title>CloudShield — Security by design</title>
+  <link rel="stylesheet" href="/styles.css">
+  <script src="/app.js" type="module"></script>
+</head>
+<body>
+  <header><a class="brand" href="/">◈ CloudShield</a><span class="tag">DEVSECOPS / ENGINEERING PORTFOLIO</span></header>
+  <main>
+    <section class="hero">
+      <p class="eyebrow">CLOUD SECURITY AUTOMATION</p>
+      <h1>Security checks.<br>Before deployment.</h1>
+      <p class="intro">A reproducible pipeline that connects source analysis, infrastructure validation, container scanning, and runtime testing — with evidence at every gate.</p>
+      <a class="button" href="#pipeline">Explore the pipeline <span>↗</span></a>
+      <div class="meta"><span>Terraform + LocalStack</span><span>Kubernetes + Kind</span><span>GitHub Actions</span></div>
+    </section>
+    <aside class="principle"><p class="eyebrow">THE ENGINEERING PRINCIPLE</p><h2>Fail closed.<br>Keep the evidence.</h2><p>Security findings stop the release path. Scanner failures stay failures. Reports are retained even when a gate blocks the pipeline.</p><div class="status"><span class="dot"></span> Portfolio lab · results require a real scan</div></aside>
+    <section id="pipeline" class="pipeline"><div class="section-title"><div><p class="eyebrow">01 / SECURITY LAYERS</p><h2>From commit to confidence.</h2></div><span>Seven stages. One reviewable trail.</span></div><div id="stages" class="stages" aria-live="polite"><p>Loading pipeline configuration…</p></div></section>
+    <section class="details"><article><p class="eyebrow">02 / REPRODUCIBILITY</p><h2>Run it. Inspect it. Challenge it.</h2><p>The portal runs on Node.js with zero application dependencies. The repository includes a hardened container, Kubernetes manifests, local AWS emulation, and a separate vulnerable target for security experiments.</p><code>npm ci<br>npm test<br>npm start</code></article><article><p class="eyebrow">03 / HONEST EVIDENCE</p><h2>Configured is not verified.</h2><p>This page explains the pipeline; it is not a live security dashboard. Actual findings, SBOMs, and scan logs come from GitHub Actions artifacts. Juice Shop belongs to the isolated learning lab and is never a production release target.</p><p class="note">Read the repository's validation record and production checklist before deployment.</p></article></section>
+  </main>
+  <footer><span>◈ CloudShield</span><span>Shift left. Review the results.</span></footer>
+</body>
+</html>
